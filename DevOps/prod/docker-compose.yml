@@ -1,10 +1,11 @@
-name: anprvision-kafka-${DEPLOY_ENV}
+name: anprvision-kafka-prod
 version: "3.9"
 
 services:
-  kafka-${DEPLOY_ENV}:
+
+  kafka-prod:
     image: bitnamilegacy/kafka:4.0.0
-    container_name: kafka-${DEPLOY_ENV}
+    container_name: kafka-prod
     ports:
       - "${KAFKA_PORT_INTERNAL}:${KAFKA_PORT_INTERNAL}"
       - "${KAFKA_PORT_EXTERNAL}:${KAFKA_PORT_EXTERNAL}"
@@ -13,16 +14,16 @@ services:
       KAFKA_CFG_PROCESS_ROLES: broker,controller
       KAFKA_CFG_LISTENERS: PLAINTEXT://:${KAFKA_PORT_INTERNAL},CONTROLLER://:9093,PLAINTEXT_HOST://:${KAFKA_PORT_EXTERNAL}
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka-${DEPLOY_ENV}:9093
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka-prod:9093
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-${DEPLOY_ENV}:${KAFKA_PORT_INTERNAL},PLAINTEXT_HOST://localhost:${KAFKA_PORT_EXTERNAL}
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-prod:${KAFKA_PORT_INTERNAL},PLAINTEXT_HOST://localhost:${KAFKA_PORT_EXTERNAL}
       ALLOW_PLAINTEXT_LISTENER: "yes"
       KAFKA_CFG_LOG_RETENTION_HOURS: ${KAFKA_LOG_RETENTION_HOURS}
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: ${KAFKA_AUTO_CREATE_TOPICS_ENABLE}
     volumes:
-      - kafka_data_${DEPLOY_ENV}:/bitnami/kafka
+      - kafka_data_prod:/bitnami/kafka
     networks:
-      - anpr-net-${DEPLOY_ENV}
+      - anpr-net-prod
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "bash", "-c", "nc -z localhost ${KAFKA_PORT_INTERNAL} || nc -z localhost ${KAFKA_PORT_EXTERNAL}"]
@@ -30,47 +31,46 @@ services:
       timeout: 5s
       retries: 12
 
-  kafka-init-${DEPLOY_ENV}:
+  kafka-init-prod:
     image: bitnamilegacy/kafka:4.0.0
-    container_name: kafka-init-${DEPLOY_ENV}
+    container_name: kafka-init-prod
     depends_on:
-      - kafka-${DEPLOY_ENV}
+      - kafka-prod
     env_file:
       - .env
     entrypoint: >
       bash -c "
-        echo '⏳ Esperando Kafka ${DEPLOY_ENV}...';
+        echo '⏳ Esperando Kafka PROD...';
         for i in $(seq 1 60); do
           /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server ${KAFKA_BROKER} --list >/dev/null 2>&1 && { echo '✅ Kafka listo'; break; }
           sleep 1;
         done;
-        echo '📦 Creando tópicos para ${DEPLOY_ENV}...';
+        echo '📦 Creando tópicos para PROD...';
         /opt/bitnami/kafka/bin/kafka-topics.sh --create --bootstrap-server ${KAFKA_BROKER} --replication-factor ${KAFKA_REPLICATION_FACTOR} --partitions ${KAFKA_NUM_PARTITIONS} --topic ${KAFKA_TOPIC_PLATE} --if-not-exists;
         /opt/bitnami/kafka/bin/kafka-topics.sh --create --bootstrap-server ${KAFKA_BROKER} --replication-factor ${KAFKA_REPLICATION_FACTOR} --partitions ${KAFKA_NUM_PARTITIONS} --topic ${KAFKA_TOPIC_CAMERAS} --if-not-exists;
-        echo '✅ kafka-init-${DEPLOY_ENV} completado.';
+        echo '✅ kafka-init-prod completado.';
       "
     networks:
-      - anpr-net-${DEPLOY_ENV}
+      - anpr-net-prod
     restart: "no"
 
-  kafka-ui-${DEPLOY_ENV}:
+  kafka-ui-prod:
     image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui-${DEPLOY_ENV}
+    container_name: kafka-ui-prod
     ports:
       - "${KAFKA_UI_PORT}:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: ${DEPLOY_ENV}
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-${DEPLOY_ENV}:${KAFKA_PORT_INTERNAL}
+      KAFKA_CLUSTERS_0_NAME: prod
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-prod:${KAFKA_PORT_INTERNAL}
     depends_on:
-      - kafka-${DEPLOY_ENV}
+      - kafka-prod
     networks:
-      - anpr-net-${DEPLOY_ENV}
+      - anpr-net-prod
     restart: unless-stopped
 
 volumes:
-  kafka_data_${DEPLOY_ENV}:
+  kafka_data_prod:
 
 networks:
-  anpr-net-${DEPLOY_ENV}:
+  anpr-net-prod:
     external: true
-
