@@ -12,11 +12,14 @@ services:
       - "${KAFKA_PORT_EXTERNAL}:${KAFKA_PORT_EXTERNAL}"   # EXTERNAL TAILSCALE
 
     environment:
+      # ID FIJO DEL CLÚSTER (OBLIGATORIO EN KRaft)
+      KAFKA_CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+
       KAFKA_CFG_NODE_ID: 1
       KAFKA_CFG_PROCESS_ROLES: broker,controller
 
       # -----------------------------------------------------
-      # 1) LISTENERS (dónde escucha Kafka)
+      # LISTENERS (interno AWS + externo Tailscale)
       # -----------------------------------------------------
       KAFKA_CFG_LISTENERS: |
         INTERNAL://:${KAFKA_PORT_INTERNAL},
@@ -29,23 +32,21 @@ services:
         CONTROLLER:PLAINTEXT
 
       # -----------------------------------------------------
-      # 2) QUORUM
+      # QUORUM (controller)
       # -----------------------------------------------------
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka-prod:9093
 
       # -----------------------------------------------------
-      # 3) ADVERTISED LISTENERS (lo que Kafka les dice a clientes)
+      # ADVERTISED LISTENERS
+      # - INTERNAL → backend .NET (VPC)
+      # - EXTERNAL → micro (via Tailscale)
       # -----------------------------------------------------
-      # INTERNAL  -> backend (AWS VPC)
-      # EXTERNAL -> micro (tu PC, Tailscale)
       KAFKA_CFG_ADVERTISED_LISTENERS: |
         INTERNAL://kafka-prod:${KAFKA_PORT_INTERNAL},
-        EXTERNAL://100.113.229.40:${KAFKA_PORT_EXTERNAL}
+        EXTERNAL://${KAFKA_TAILSCALE_IP}:${KAFKA_PORT_EXTERNAL}
 
-      # -----------------------------------------------------
-      # Extras
-      # -----------------------------------------------------
+      # Extra
       ALLOW_PLAINTEXT_LISTENER: "yes"
       KAFKA_CFG_LOG_RETENTION_HOURS: ${KAFKA_LOG_RETENTION_HOURS}
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: ${KAFKA_AUTO_CREATE_TOPICS_ENABLE}
@@ -94,10 +95,7 @@ services:
       - "${KAFKA_UI_PORT}:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: prod
-
-      # La UI debe usar INTERNAL
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-prod:${KAFKA_PORT_INTERNAL}
-
     depends_on:
       - kafka-prod
     networks:
